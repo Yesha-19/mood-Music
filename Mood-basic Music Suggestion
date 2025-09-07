@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mood — Mood-Based Playlist Generator</title>
+
+  <!-- Google fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg:#071024;
+      --card:#0f172a;
+      --muted:#9aa6b2;
+      --accent1:#2dd4bf;
+      --accent2:#7c3aed;
+      --glass: rgba(255,255,255,0.04);
+      --spotify-green: #1DB954;
+      --max-width:1200px;
+      --radius:12px;
+      font-family: 'Inter', system-ui, -apple-system, 'Poppins', sans-serif;
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      background: linear-gradient(180deg, #020617 0%, var(--bg) 100%);
+      color: #e6eef6;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      min-height:100vh;
+      line-height:1.35;
+    }
+
+    /* layout */
+    .screen{min-height:100vh}
+    .centered{display:flex;align-items:center;justify-content:center;padding:20px}
+
+    /* auth card */
+    .auth-card{
+      width:380px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:var(--radius);
+      padding:28px;
+      box-shadow: 0 6px 30px rgba(2,6,23,0.6);
+      text-align:center;
+    }
+    .auth-card .logo{margin:0 auto 8px}
+    .auth-card h1{margin:6px 0 4px;font-size:20px}
+    .muted{color:var(--muted)}
+    .auth-card input{
+      width:100%;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);
+      margin:8px 0;background:transparent;color:inherit;
+    }
+    .btn{
+      display:inline-block;padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.05);
+      background:transparent;color:inherit;cursor:pointer;margin-top:8px;
+    }
+    .btn.primary{background:linear-gradient(90deg,var(--accent1),var(--accent2));border:none;color:#021018}
+    .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06)}
+    .btn.danger{background:transparent;border:1px solid rgba(255,0,80,0.2);color:#ff7a8a}
+
+    /* app layout */
+    #app-screen{display:flex;min-height:100vh}
+    .sidebar{
+      width:320px;min-width:260px;background:rgba(255,255,255,0.02);padding:20px;box-shadow:inset -2px 0 0 rgba(255,255,255,0.02);
+      display:flex;flex-direction:column;
+    }
+    .brand{display:flex;gap:12px;align-items:center;margin-bottom:18px}
+    .brand h2{margin:0;font-size:18px}
+    .brand p{margin:0;color:var(--muted);font-size:12px}
+
+    .controls{flex:1;display:flex;flex-direction:column}
+    .mood-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+    .mood-btn{padding:8px 10px;border-radius:10px;border:none;background:rgba(255,255,255,0.03);cursor:pointer}
+    .mood-btn.active{background:linear-gradient(90deg,var(--accent1),var(--accent2));color:#021018}
+
+    .playlists-list{margin:8px 0 12px;display:flex;flex-direction:column;gap:8px}
+    .playlist-item{padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);display:flex;justify-content:space-between;align-items:center;font-size:14px}
+    .spacer{flex:1}
+
+    .main{flex:1;padding:20px;max-width:var(--max-width);margin:0 auto}
+    .hero{display:flex;justify-content:space-between;gap:20px;padding:20px;background:linear-gradient(90deg, rgba(255,255,255,0.01), rgba(255,255,255,0.008));border-radius:12px;margin-bottom:18px;align-items:center}
+    .hero-left{flex:1}
+    .hero-left h1{font-size:24px;margin:0 0 8px}
+    .hero-left p{color:var(--muted);margin:0 0 12px}
+    .hero-actions{display:flex;gap:8px}
+
+    .visualizer{position:relative;width:180px;height:120px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:12px;display:flex;align-items:center;justify-content:center}
+    .pulse{position:absolute;border-radius:50%;opacity:0.12;mix-blend-mode:screen}
+    .p1{width:110px;height:110px;background:radial-gradient(circle at 30% 30%, var(--accent1), transparent 60%);animation:sw 4s infinite}
+    .p2{width:70px;height:70px;background:radial-gradient(circle at 30% 30%, var(--accent2), transparent 60%);animation:sw 3s infinite}
+    .p3{width:44px;height:44px;background:linear-gradient(90deg,var(--accent1),var(--accent2));animation:sw 2.2s infinite}
+    @keyframes sw{0%{transform:scale(.85)}50%{transform:scale(1.1)}100%{transform:scale(.85)}}
+
+    .content-grid{display:grid;grid-template-columns:1fr 360px;gap:18px;margin-top:10px}
+    .results-panel{background:var(--card);padding:12px;border-radius:12px;min-height:420px}
+    .panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+    .results-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+    .result-card{background:var(--glass);padding:10px;border-radius:10px;display:flex;flex-direction:column;gap:6px}
+    .result-card h4{margin:0;font-size:14px}
+    .result-meta{font-size:12px;color:var(--muted)}
+    .result-actions{display:flex;gap:8px;margin-top:8px}
+    .small{font-size:12px}
+    .player-panel{display:flex;flex-direction:column;gap:12px}
+    .player-card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:12px;border-radius:12px;min-height:240px;display:flex;flex-direction:column}
+    .player-frame{background:rgba(0,0,0,0.35);border-radius:8px;height:180px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+    .player-frame iframe{width:100%;height:100%;border:0}
+    .player-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
+    .discover-card{background:rgba(255,255,255,0.02);padding:12px;border-radius:12px}
+    .lang-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+    .lang-tags button{padding:6px 8px;border-radius:8px;border:none;background:rgba(255,255,255,0.02);cursor:pointer}
+
+    .modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(2,6,23,0.6)}
+    .modal-card{background:var(--card);padding:18px;border-radius:10px;width:320px}
+    .hidden{display:none}
+
+    /* responsive */
+    @media(max-width:1000px){
+      .content-grid{grid-template-columns:1fr}
+      .sidebar{display:none}
+      #app-screen{flex-direction:column}
+      .main{padding:12px}
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sign-in page -->
+  <div id="auth-screen" class="screen centered">
+    <div class="auth-card">
+      <div class="logo" aria-hidden>
+        <!-- Simple SVG logo -->
+        <svg viewBox="0 0 100 100" width="64" height="64" aria-hidden>
+          <defs>
+            <linearGradient id="g1" x1="0" x2="1">
+              <stop offset="0" stop-color="#2dd4bf"/>
+              <stop offset="1" stop-color="#7c3aed"/>
+            </linearGradient>
+          </defs>
+          <circle cx="50" cy="50" r="45" fill="url(#g1)"></circle>
+          <path d="M35 30 L65 50 L35 70 Z" fill="#fff"></path>
+        </svg>
+      </div>
+
+      <h1>Mood — Playlist Generator</h1>
+      <p class="muted">Sign in to create mood-based playlists & play tracks in-page</p>
+
+      <div class="auth-forms">
+        <div id="signup" class="auth-section">
+          <input id="su-name" placeholder="Your name" autocomplete="name" />
+          <input id="su-email" placeholder="Email" autocomplete="email" />
+          <input id="su-pass" type="password" placeholder="Password" autocomplete="new-password" />
+          <div style="display:flex;gap:8px;justify-content:center">
+            <button id="btn-signup" class="btn primary">Create account</button>
+          </div>
+          <p class="muted small">Already have an account? <a href="#" id="to-signin">Sign in</a></p>
+        </div>
+
+        <div id="signin" class="auth-section hidden">
+          <input id="in-email" placeholder="Email" autocomplete="email" />
+          <input id="in-pass" type="password" placeholder="Password" autocomplete="current-password" />
+          <div style="display:flex;gap:8px;justify-content:center">
+            <button id="btn-signin" class="btn primary">Sign in</button>
+          </div>
+          <p class="muted small">New here? <a href="#" id="to-signup">Create one</a></p>
+        </div>
+      </div>
+
+      <p class="muted small" style="margin-top:12px">This demo stores everything locally in your browser. For webcam-based mood detection you must host on HTTPS.</p>
+    </div>
+  </div>
+
+  <!-- Main app -->
+  <div id="app-screen" class="screen hidden" aria-hidden>
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-logo" aria-hidden>
+          <svg viewBox="0 0 100 100" width="44" height="44" aria-hidden>
+            <defs>
+              <linearGradient id="g2" x1="0" x2="1">
+                <stop offset="0" stop-color="#2dd4bf"/>
+                <stop offset="1" stop-color="#7c3aed"/>
+              </linearGradient>
+            </defs>
+            <circle cx="50" cy="50" r="45" fill="url(#g2)"></circle>
+            <path d="M40 35 L70 50 L40 65 Z" fill="#fff"></path>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h2 id="brand-name">Mood</h2>
+          <p class="small muted">Playlist generator</p>
+        </div>
+      </div>
+
+      <div class="controls">
+        <h3>Choose mood</h3>
+        <div class="mood-row">
+          <button class="mood-btn" data-mood="happy">😊 Happy</button>
+          <button class="mood-btn" data-mood="sad">😢 Sad</button>
+          <button class="mood-btn" data-mood="chill">😌 Chill</button>
+          <button class="mood-btn" data-mood="energetic">⚡ Energetic</button>
+          <button class="mood-btn" data-mood="romantic">💖 Romantic</button>
+        </div>
+
+        <h3>Language</h3>
+        <select id="lang-filter">
+          <option value="all">All languages</option>
+          <option value="English">English</option>
+          <option value="Hindi">Hindi</option>
+          <option value="Tamil">Tamil</option>
+          <option value="Telugu">Telugu</option>
+          <option value="Bengali">Bengali</option>
+        </select>
+
+        <h3 style="margin-top:12px">My Playlists</h3>
+        <div id="user-playlists" class="playlists-list"></div>
+
+        <button id="create-playlist-btn" class="btn" style="margin-top:8px">Create new playlist</button>
+
+        <div class="spacer"></div>
+
+        <button id="btn-signout" class="btn danger">Sign out</button>
+      </div>
+    </aside>
+
+    <main class="main" role="main">
+      <!-- top animated banner -->
+      <section class="hero" aria-hidden>
+        <div class="hero-left">
+          <h1>Feel it. Hear it. <span style="color:var(--accent1)">Playlists</span> that match your mood.</h1>
+          <p class="muted">Choose a mood or let the webcam attempt to detect your emotion. We'll recommend tracks & videos — play them right here.</p>
+
+          <div class="hero-actions" style="margin-top:12px">
+            <button id="try-webcam" class="btn ghost">🎥 Try webcam (HTTPS)</button>
+            <button id="random-mix" class="btn">Surprise me</button>
+          </div>
+        </div>
+
+        <div class="hero-right">
+          <div class="visualizer" aria-hidden>
+            <div class="pulse p1"></div>
+            <div class="pulse p2"></div>
+            <div class="pulse p3"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- results & player -->
+      <section class="content-grid">
+        <div class="results-panel" aria-live="polite">
+          <div class="panel-head">
+            <h3>Suggested tracks</h3>
+            <p class="muted small" id="result-count">Showing —</p>
+          </div>
+          <div id="results" class="results-list" aria-atomic="true">
+            <!-- populated by JS -->
+          </div>
+        </div>
+
+        <div class="player-panel" aria-hidden>
+          <div class="player-card">
+            <h3 id="player-title">Nothing playing</h3>
+            <div id="player-frame" class="player-frame" aria-live="polite">
+              <div class="placeholder">
+                <p>Select a track to play</p>
+                <small class="muted">Tracks play inside this box via Spotify Embed or YouTube embed.</small>
+              </div>
+            </div>
+
+            <div class="player-actions">
+              <button id="add-to-user-playlist" class="btn" disabled>＋ Add to my playlist</button>
+              <button id="stop-btn" class="btn ghost">Stop</button>
+            </div>
+          </div>
+
+          <div class="discover-card">
+            <h4>Filters & language picks</h4>
+            <div class="lang-tags" id="lang-tags">
+              <!-- clickable tags inserted by JS -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- modal to create playlist -->
+      <div id="modal" class="modal hidden" aria-hidden>
+        <div class="modal-card">
+          <h3>Create playlist</h3>
+          <input id="new-playlist-name" placeholder="Playlist name" />
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+            <button id="save-playlist" class="btn primary">Save</button>
+            <button id="cancel-playlist" class="btn ghost">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script>
+  /**************************************************************************
+   * Single-file Mood Playlist app (HTML + CSS + vanilla JS)
+   * - Stores demo users & playlists in localStorage
+   * - Mood buttons filter suggestions
+   * - Language filtering
+   * - Play tracks inside embed iframe (Spotify or YouTube)
+   * - Create / save playlists locally
+   **************************************************************************/
+
+  document.addEventListener('DOMContentLoaded', function() {
+
+    // ---------- Sample dataset ----------
+    // embed should be either Spotify embed URL or YouTube embed URL
+    const TRACKS = [
+      { id: 's1', title: 'Sunshine Vibes', artist: 'Indie Beats', moods:['happy','chill'], language:'English', source:'spotify', embed: 'https://open.spotify.com/embed/track/6rqhFgbbKwnb9MLmUQDhG6' },
+      { id: 's2', title: 'Dil Khush', artist: 'Ananya ft. Rohan', moods:['happy','romantic'], language:'Hindi', source:'youtube', embed: 'https://www.youtube.com/embed/5qap5aO4i9A' },
+      { id: 's3', title: "Munna's Melody", artist: 'Telugu Artist', moods:['romantic','chill'], language:'Telugu', source:'youtube', embed: 'https://www.youtube.com/embed/DLX62G4lc44' },
+      { id: 's4', title: 'Energetic Rush', artist: 'ClubBeat', moods:['energetic'], language:'English', source:'spotify', embed: 'https://open.spotify.com/embed/track/7GhIk7Il098yCjg4BQjzvb' },
+      { id: 's5', title: 'Saudade (Remix)', artist: 'Bollywood Remix', moods:['sad','chill'], language:'Hindi', source:'youtube', embed: 'https://www.youtube.com/embed/kXYiU_JCYtU' },
+      { id: 's6', title: 'Tamil Sunrise', artist: 'Tamil Folk', moods:['happy','energetic'], language:'Tamil', source:'youtube', embed: 'https://www.youtube.com/embed/ScNNfyq3d_w' },
+      { id: 's7', title: 'Bengali Breeze', artist: 'Bengali Singer', moods:['chill'], language:'Bengali', source:'youtube', embed: 'https://www.youtube.com/embed/2Vv-BfVoq4g' },
+      { id: 's8', title: 'Rainy Blues', artist: 'Acoustic Duo', moods:['sad','chill'], language:'English', source:'spotify', embed: 'https://open.spotify.com/embed/track/1zHlj4dQ8ZAtrayhuDDmkY' },
+      { id: 's9', title: 'Bollywood Beats', artist: 'DJ India', moods:['energetic','happy'], language:'Hindi', source:'spotify', embed: 'https://open.spotify.com/embed/playlist/37i9dQZF1DXcBWIGoYBM5M' },
+      { id: 's10', title: 'Evening Raga', artist: 'Classical India', moods:['chill','romantic'], language:'Hindi', source:'youtube', embed: 'https://www.youtube.com/embed/3JZ4pnNtyxQ' },
+      { id: 's11', title: 'Chillhop India', artist: 'LoFi Squad', moods:['chill','happy'], language:'English', source:'youtube', embed: 'https://www.youtube.com/embed/5yx6BWlEVcY' },
+    ];
+
+    // ---------- App state ----------
+    let currentMood = null;
+    let currentLang = 'all';
+    let activeTrack = null; // full track object
+    let selectedForPlaylist = []; // ids selected for add-to-playlist
+
+    // DOM nodes
+    const authScreen = document.getElementById('auth-screen');
+    const appScreen = document.getElementById('app-screen');
+    const signupSect = document.getElementById('signup');
+    const signinSect = document.getElementById('signin');
+    const toSignup = document.getElementById('to-signup');
+    const toSignin = document.getElementById('to-signin');
+
+    const resultsNode = document.getElementById('results');
+    const resultCount = document.getElementById('result-count');
+    const langFilter = document.getElementById('lang-filter');
+    const langTagsNode = document.getElementById('lang-tags');
+    const userPlaylistsNode = document.getElementById('user-playlists');
+
+    // auth helpers
+    function saveUserLocally(obj) {
+      localStorage.setItem('mood_user_'+obj.email, JSON.stringify(obj));
+    }
+    function getUser(email) {
+      try { return JSON.parse(localStorage.getItem('mood_user_'+email)); } catch(e){ return null; }
+    }
+    function loggedEmail() { return localStorage.getItem('mood_logged') || null; }
+
+    function openApp() {
+      authScreen.classList.add('hidden');
+      authScreen.setAttribute('aria-hidden','true');
+      appScreen.classList.remove('hidden');
+      appScreen.removeAttribute('aria-hidden');
+      renderTracks();
+      loadUserPlaylistsUI();
+      personalizeSidebar();
+      renderLangTags();
+    }
+    function personalizeSidebar(){
+      const email = loggedEmail();
+      if(!email) return;
+      const user = getUser(email);
+      const brandName = document.getElementById('brand-name');
+      if(user && brandName) brandName.textContent = 'Mood • ' + (user.name || user.email);
+    }
+
+    // init auth events
+    toSignup.addEventListener('click', function(e){ e.preventDefault(); signinSect.classList.add('hidden'); signupSect.classList.remove('hidden'); });
+    toSignin.addEventListener('click', function(e){ e.preventDefault(); signupSect.classList.add('hidden'); signinSect.classList.remove('hidden'); });
+
+    document.getElementById('btn-signup').addEventListener('click', function(){
+      const name = (document.getElementById('su-name').value || '').trim();
+      const email = (document.getElementById('su-email').value || '').trim().toLowerCase();
+      const pass = (document.getElementById('su-pass').value || '');
+      if(!email || !pass){ alert('Please enter email and password'); return; }
+      if(getUser(email)){ alert('Account already exists — sign in instead'); return; }
+      saveUserLocally({ name, email, pass });
+      localStorage.setItem('mood_logged', email);
+      openApp();
+    });
+
+    document.getElementById('btn-signin').addEventListener('click', function(){
+      const email = (document.getElementById('in-email').value || '').trim().toLowerCase();
+      const pass = (document.getElementById('in-pass').value || '');
+      const u = getUser(email);
+      if(!u){ alert('No such account'); return; }
+      if(u.pass !== pass){ alert('Incorrect password'); return; }
+      localStorage.setItem('mood_logged', email);
+      openApp();
+    });
+
+    // sign out
+    document.getElementById('btn-signout').addEventListener('click', function(){
+      localStorage.removeItem('mood_logged');
+      location.reload();
+    });
+
+    // mood buttons
+    document.querySelectorAll('.mood-btn').forEach(btn=>{
+      btn.addEventListener('click', function(){
+        document.querySelectorAll('.mood-btn').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        currentMood = btn.dataset.mood;
+        renderTracks();
+        // scroll results into view
+        document.getElementById('results').scrollIntoView({behavior:'smooth', block:'start'});
+      });
+    });
+
+    // language select
+    langFilter.addEventListener('change', function(e){
+      currentLang = e.target.value;
+      renderTracks();
+    });
+
+    // random mix / webcam
+    document.getElementById('random-mix').addEventListener('click', function(){
+      const r = TRACKS[Math.floor(Math.random()*TRACKS.length)];
+      playTrack(r.id);
+    });
+    document.getElementById('try-webcam').addEventListener('click', function(){
+      alert('Webcam mood detection requires HTTPS hosting and an ML model (e.g. face-api.js). This demo only shows the UI.');
+    });
+
+    // stop
+    document.getElementById('stop-btn').addEventListener('click', function(){
+      document.getElementById('player-frame').innerHTML = '<div class="placeholder"><p>Select a track to play</p><small class="muted">Tracks play here via Spotify or YouTube embed.</small></div>';
+      document.getElementById('player-title').textContent = 'Nothing playing';
+      activeTrack = null;
+      document.getElementById('add-to-user-playlist').disabled = true;
+    });
+
+    // create playlist modal flow
+    document.getElementById('create-playlist-btn').addEventListener('click', function(){
+      document.getElementById('modal').classList.remove('hidden');
+      document.getElementById('modal').removeAttribute('aria-hidden');
+      document.getElementById('new-playlist-name').focus();
+    });
+    document.getElementById('cancel-playlist').addEventListener('click', function(){
+      document.getElementById('modal').classList.add('hidden');
+      document.getElementById('modal').setAttribute('aria-hidden','true');
+    });
+
+    document.getElementById('save-playlist').addEventListener('click', function(){
+      const name = (document.getElementById('new-playlist-name').value || '').trim();
+      if(!name){ alert('Enter a playlist name'); return; }
+      const logged = loggedEmail();
+      if(!logged){ alert('Sign in first'); return; }
+      const key = 'mood_playlists_'+logged;
+      const existing = JSON.parse(localStorage.getItem(key) || '[]');
+      const pl = { id: 'pl_'+Date.now(), name, items: selectedForPlaylist.slice() };
+      existing.push(pl);
+      localStorage.setItem(key, JSON.stringify(existing));
+      selectedForPlaylist = [];
+      document.getElementById('modal').classList.add('hidden');
+      document.getElementById('modal').setAttribute('aria-hidden','true');
+      document.getElementById('new-playlist-name').value = '';
+      document.getElementById('add-to-user-playlist').disabled = true;
+      loadUserPlaylistsUI();
+      alert('Playlist saved locally');
+    });
+
+    // add-to-user-playlist quick button opens modal if no selection
+    document.getElementById('add-to-user-playlist').addEventListener('click', function(){
+      // if no selected tracks but activeTrack exists, add that
+      if(selectedForPlaylist.length === 0 && activeTrack) {
+        selectedForPlaylist.push(activeTrack.id);
+      }
+      document.getElementById('modal').classList.remove('hidden');
+      document.getElementById('modal').removeAttribute('aria-hidden');
+    });
+
+    // result filtering
+    function filterTracks(){
+      return TRACKS.filter(t=>{
+        const moodOk = !currentMood || t.moods.includes(currentMood);
+        const langOk = currentLang === 'all' || t.language === currentLang;
+        return moodOk && langOk;
+      });
+    }
+    function ensureMinResults(arr){
+      // ensure at least 6 suggestions (fillers allowed)
+      if(arr.length >= 6) return arr;
+      const extras = TRACKS.filter(t => !arr.includes(t) && (currentLang==='all' || t.language === currentLang));
+      return arr.concat(extras).slice(0, Math.max(6, arr.length + extras.length));
+    }
+
+    // render tracks grid
+    function renderTracks(){
+      const filtered = filterTracks();
+      const toShow = ensureMinResults(filtered);
+      resultsNode.innerHTML = '';
+      resultCount.textContent = `Showing ${toShow.length} suggestions`;
+      toShow.forEach(track => {
+        const card = document.createElement('div');
+        card.className = 'result-card';
+        card.innerHTML = `
+          <div>
+            <h4>${escapeHtml(track.title)}</h4>
+            <div class="result-meta">${escapeHtml(track.artist)} • ${escapeHtml(track.language)} • ${escapeHtml(track.moods.join(', '))}</div>
+          </div>
+          <div class="result-actions">
+            <button class="btn play-btn" data-id="${track.id}">▶ Play</button>
+            <button class="btn add-btn" data-id="${track.id}">＋ Add</button>
+          </div>
+        `;
+        resultsNode.appendChild(card);
+      });
+
+      // attach handlers
+      document.querySelectorAll('.play-btn').forEach(b=>{
+        b.addEventListener('click', ()=>playTrack(b.dataset.id));
+      });
+      document.querySelectorAll('.add-btn').forEach(b=>{
+        b.addEventListener('click', function(){
+          const id = b.dataset.id;
+          if(!selectedForPlaylist.includes(id)) selectedForPlaylist.push(id);
+          document.getElementById('add-to-user-playlist').disabled = false;
+          b.textContent = 'Selected';
+          b.disabled = true;
+        });
+      });
+
+      renderLangTags(); // refresh tags highlighting
+    }
+
+    // play a track inside the iframe area
+    function playTrack(trackId){
+      const t = TRACKS.find(x=>x.id === trackId);
+      if(!t) return;
+      activeTrack = t;
+      document.getElementById('player-title').textContent = `${t.title} — ${t.artist}`;
+      const frame = document.getElementById('player-frame');
+      frame.innerHTML = ''; // clear
+      if(t.source === 'spotify' && t.embed.includes('open.spotify.com')) {
+        const iframe = document.createElement('iframe');
+        iframe.src = t.embed + (t.embed.includes('?') ? '&' : '?') + 'utm_source=app';
+        iframe.allow = 'autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture';
+        frame.appendChild(iframe);
+      } else {
+        // youtube embed
+        const iframe = document.createElement('iframe');
+        iframe.src = t.embed + '?enablejsapi=1&rel=0';
+        iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+        frame.appendChild(iframe);
+      }
+      document.getElementById('add-to-user-playlist').disabled = false;
+    }
+
+    // playlist UI (sidebar)
+    function loadUserPlaylistsUI(){
+      const logged = loggedEmail();
+      userPlaylistsNode.innerHTML = '';
+      if(!logged) { userPlaylistsNode.innerHTML = '<div class="muted small">Sign in to see playlists</div>'; return; }
+      const key = 'mood_playlists_'+logged;
+      const arr = JSON.parse(localStorage.getItem(key) || '[]');
+      if(arr.length === 0){
+        userPlaylistsNode.innerHTML = '<div class="muted small">No playlists yet. Create one!</div>'; return;
+      }
+      arr.forEach(pl=>{
+        const item = document.createElement('div');
+        item.className = 'playlist-item';
+        item.innerHTML = `<div>${escapeHtml(pl.name)} <small class="muted">(${pl.items.length})</small></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn play-pl" data-id="${pl.id}">▶</button>
+            <button class="btn ghost del-pl" data-id="${pl.id}">✕</button>
+          </div>`;
+        userPlaylistsNode.appendChild(item);
+      });
+
+      document.querySelectorAll('.play-pl').forEach(b=>{
+        b.addEventListener('click', ()=>{
+          const id = b.dataset.id;
+          playPlaylist(id);
+        });
+      });
+      document.querySelectorAll('.del-pl').forEach(b=>{
+        b.addEventListener('click', ()=>{
+          const id = b.dataset.id;
+          if(!confirm('Delete playlist?')) return;
+          deletePlaylist(id);
+          loadUserPlaylistsUI();
+        });
+      });
+    }
+
+    function playPlaylist(plid){
+      const logged = loggedEmail();
+      const arr = JSON.parse(localStorage.getItem('mood_playlists_'+logged) || '[]');
+      const pl = arr.find(x=>x.id===plid);
+      if(!pl || pl.items.length === 0){ alert('Empty playlist'); return; }
+      // play first item and list remaining in results
+      playTrack(pl.items[0]);
+      const tmp = pl.items.map(id => TRACKS.find(t => t.id === id)).filter(Boolean);
+      resultsNode.innerHTML = '';
+      tmp.forEach(track => {
+        const card = document.createElement('div');
+        card.className = 'result-card';
+        card.innerHTML = `<div><h4>${escapeHtml(track.title)}</h4><div class="result-meta">${escapeHtml(track.artist)}</div></div>
+          <div class="result-actions"><button class="btn play-btn" data-id="${track.id}">▶ Play</button></div>`;
+        resultsNode.appendChild(card);
+      });
+      document.querySelectorAll('.play-btn').forEach(b => b.addEventListener('click', ()=>playTrack(b.dataset.id)));
+    }
+
+    function deletePlaylist(id){
+      const logged = loggedEmail();
+      const key = 'mood_playlists_'+logged;
+      const arr = JSON.parse(localStorage.getItem(key) || '[]');
+      const nxt = arr.filter(x=> x.id !== id);
+      localStorage.setItem(key, JSON.stringify(nxt));
+    }
+
+    // language tags
+    function renderLangTags(){
+      const langs = Array.from(new Set(TRACKS.map(t=>t.language)));
+      langTagsNode.innerHTML = '';
+      langs.forEach(l => {
+        const btn = document.createElement('button');
+        btn.textContent = l;
+        btn.addEventListener('click', ()=> {
+          langFilter.value = l;
+          currentLang = l;
+          renderTracks();
+        });
+        langTagsNode.appendChild(btn);
+      });
+    }
+
+    // small helpers
+    function escapeHtml(s){ return (s||'').toString().replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+    // Init: if already signed in, open app
+    (function init(){
+      if(localStorage.getItem('mood_logged')){
+        openApp();
+      } else {
+        authScreen.classList.remove('hidden');
+        appScreen.classList.add('hidden');
+      }
+    })();
+
+    // Expose loadUserPlaylistsUI to button actions where needed
+    window.loadUserPlaylistsUI = loadUserPlaylistsUI;
+    window.renderTracks = renderTracks;
+  });
+  </script>
+
+</body>
+</html>
